@@ -48,7 +48,7 @@ fi
 		exit 1;
 	fi
 
-	if [ "$IPV6_USE_SESSION" -eq "1" && \( ! -z "$SESSION" \) && -s "${IPV6_USER_SESSION}$SESSION"  ] 
+	if [ "$IPV6_USE_SESSION" -eq "1" -a \( ! -z "$SESSION" \) -a -s "${IPV6_USER_SESSION}$SESSION" ]
 	then
 		IPV6_SESSION="$(cat "${IPV6_USER_SESSION}$SESSION")"
 		if [ ! -f "$IPV6_SESSION" ]
@@ -60,13 +60,13 @@ fi
 		IPV6_SESSION=""
 	fi
 	IPV6_EXISTING="$(echo $IPV6_SESSION && find $IPV6_NETWORK_PREFIXES -type f -name '*:*' | sort -R)"
-	echo "Valid ipv6 address files:"
-	echo "$IPV6_EXISTING"
+#	echo "Valid ipv6 address files:"
+#	echo "$IPV6_EXISTING"
 
 	found=""
 	for range in $IPV6_EXISTING
 	do
-		if [ ! -z "$range" ]
+		if [ -z "$range" ]
 		then
 			continue;
 		fi
@@ -113,17 +113,36 @@ fi
 	echo "interface $IFACE {" 				> "$RA"
 	echo "    AdvSendAdvert on;" 				>> "$RA"
 	echo "    MinRtrAdvInterval 5;" 			>> "$RA"
-	echo "    MaxRtrAdvInterval 100;" 			>> "$RA"
-	echo "    AdvRetransTimer 600000; " 			>> "$RA"
+	echo "    MaxRtrAdvInterval 90;" 			>> "$RA"
+	echo "    AdvRetransTimer 5000; " 			>> "$RA"
+	echo "    AdvReachableTime 180; " 			>> "$RA"
+	echo "    AdvDefaultLifetime 180;"			>> "$RA"
+	echo "    AdvSourceLLAddress on;"			>> "$RA"
+	echo "    AdvOtherConfigFlag on;"			>> "$RA"
+	echo "    AdvManagedFlag on;"				>> "$RA"
 	echo "    prefix $addr:/64 {DeprecatePrefix on;};" 	>> "$RA"
 	echo "    route ::/0 {RemoveRoute on;};"            	>> "$RA"
 	echo "    RDNSS $IFADDR {}; "                      	>> "$RA"
-	echo "    DNSSL rp01.local {};"  			>> "$RA"
+	echo "    DNSSL ferrybig.local {};"  			>> "$RA"
 	echo " };" 						>> "$RA"
 	
 	/usr/sbin/radvd -C "$RA" -p "$RAP" 200>/dev/null
 	
-	echo "Connection setup"
+	
+	DHCP="$CONFIG.dhcp6s.conf"
+	DHCP_PID="$CONFIG.dhcp6s.pid"
+	echo "option domain-name-servers $IFADDR;"		> "$DHCP"
+	echo 'option domain-name "ferrybig.local";'		>> "$DHCP"
+	echo "interface $IFACE {"				>> "$DHCP"
+	echo "    allow rapid-commit;"				>> "$DHCP"
+	echo "};"						>> "$DHCP"
+
+	/usr/sbin/dhcp6s -c "$DHCP" -P "$DHCP_PID" "$IFACE" 200>/dev/null
+
+
+
+
+	echo "Connection setup, using range: $addr"
 	
 	
 	
