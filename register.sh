@@ -115,12 +115,13 @@ fi
 	echo "    MinRtrAdvInterval 5;" 			>> "$RA"
 	echo "    MaxRtrAdvInterval 90;" 			>> "$RA"
 	echo "    AdvRetransTimer 5000; " 			>> "$RA"
-	echo "    AdvReachableTime 180; " 			>> "$RA"
-	echo "    AdvDefaultLifetime 180;"			>> "$RA"
+	echo "    AdvReachableTime 1800; " 			>> "$RA"
+	echo "    AdvDefaultLifetime 1800;"			>> "$RA"
 	echo "    AdvSourceLLAddress on;"			>> "$RA"
 	echo "    AdvOtherConfigFlag on;"			>> "$RA"
 	echo "    AdvManagedFlag on;"				>> "$RA"
-	echo "    prefix $addr:/64 {DeprecatePrefix on;};" 	>> "$RA"
+#	echo "    UnicastOnly on;"				>> "$RA"
+	echo "    prefix $addr:/64 {};"			 	>> "$RA"
 	echo "    route ::/0 {RemoveRoute on;};"            	>> "$RA"
 	echo "    RDNSS $IFADDR {}; "                      	>> "$RA"
 	echo "    DNSSL ferrybig.local {};"  			>> "$RA"
@@ -142,7 +143,7 @@ fi
 
 
 
-	echo "Connection setup, using range: $addr"
+	echo "Connection setup, using range: $addr:1/64, session: $SESSION"
 	
 	
 	
