@@ -3,17 +3,14 @@ MYDIR="$(dirname "$(readlink -f "$0")")"
 
 . "$MYDIR/config.sh" || exit 1;
 
-IFACE=""
-IFADDR=""
 SESSION=""
-
-
-
 PREFIX=0
 TARGETS=""
 REMOTE=""
 SESSION=""
 VERSION=0
+LOCAL=""
+LOCAL_DETECT=0
 HELP=0
 INCORRECT=0
 while [[ $# > 0 ]]
@@ -32,6 +29,14 @@ do
                 -r|--remote)
                         REMOTE="$2"
                         shift 2
+                ;;
+                -l|--local)
+                        LOCAL="$2"
+                        shift 2
+                ;;
+                -ld|--local-detect)
+                        LOCAL_DETECT=1
+                        shift
                 ;;
                 -V|--version)
                         VERSION=1
@@ -53,7 +58,7 @@ do
         esac
 done
 
-if [ "$INCORRECT" -eq 1 ]
+if [ "$INCORRECT" -eq 1 -o -z "$TARGETS"] 
 then
         echo "Incorrect usage" &1>2
         exit 1
@@ -81,6 +86,17 @@ fi
 
         for IFACE in $TARGETS
         do
+                echo "Configuring interface $IFACE"
+                if [ "$LOCAL_DETECT" -eq 1 -o -z "$LOCAL"]; then
+                        LOCAL="$(ip -6 addr show ppp0 | grep -F link | grep -oEi "fe80\:(\:[a-fA-F0-9]{1,4}){1,7}")"
+
+                        if [ -z "$LOCAL" ]; then
+                                echo "No link local address found.. Cannot configure $IFACE";
+                                exit 1;
+                        fi
+                fi
+
+
                 if [ -f "$IPV6_NETWORK_IFACE$IFACE.range" ]
                 then
                         echo "Interface $IFACE is already configured! unregister first or clear file $IPV6_NETWORK_IFACE$IFACE.range"
@@ -105,31 +121,53 @@ fi
                 found=""
                 for range in $IPV6_EXISTING
                 do
-                        if [ -z "$range" ]
-                        then
+                        if [ -z "$range" ];then
                                 continue;
                         fi
-                        if [ ! -s "$range" ]
-                        then
+                        if [ ! -s "$range" ];then
                                 found="$range"
                                 break;
                         else
                                 echo "Skipping range $range as it isn't empty"
                         fi
-
                 done
 
+                foundprefix=""
+                if [ "$PREFIX" -eq 1 ]; then
+                        for range in $IPV6_EXISTING; do
+                                if [ -z "$range" ]; then
+                                        continue;
+                                fi
+                                if [ ! -s "$range" -a "$range" -eq "$found"]; then
+                                        foundprefix="$range"
+                                        break;
+                                else
+                                        echo "Skipping range $range as it isn't empty"
+                                fi
+                        done
+                fi
 
-                if [ -z "$found" ]
-                then
-                        echo "No free prefix found! Is there a problem with "
+
+                if [ -z "$found" ]; then
+                        echo "No free prefix found! Is there a problem with the prefixes"
                         exit 1
                 fi
-
-                if [ "$IPV6_USE_SESSION" -eq "1" ]
-                then
-                        echo "$found" > "${IPV6_USER_SESSION}$SESSION"
+                if [ -z "$foundprefix" -a "$PREFIX" -eq 1]; then
+                        PREFIX=0
+                        echo "No free prefix delegation found!"
                 fi
+                if [ "$IPV6_USE_SESSION" -eq "1" ]; then
+                        echo "$found" > "${IPV6_USER_SESSION}$SESSION"
+                        if [ "$PREFIX" -eq 1 ]; then
+                                echo "$foundprefix" >> "${IPV6_USER_SESSION}$SESSION"
+                        fi
+                fi
+
+
+
+
+
+
                 range="$found";
                 addr="$(basename $range)"
                 if [ -z "$IFACE" ]
@@ -137,7 +175,7 @@ fi
                         echo "Test mode, found range: $addr in file $range"
                         exit 0;
                 fi
-                echo "Configuring interface $IFACE"
+                
                 echo "$IFACE" > "$range"
                 echo "$range" > "$IPV6_NETWORK_IFACE$IFACE.range"
                 #echo "$range" > "$IPV6_NETWORK_IFACE$IFACE.last"
@@ -159,11 +197,15 @@ fi
                 echo "    AdvSourceLLAddress on;"                          >> "$RA"
                 echo "    AdvOtherConfigFlag on;"                          >> "$RA"
                 echo "    AdvManagedFlag on;"                              >> "$RA"
-        #        echo "    UnicastOnly on;"                                 >> "$RA"
+                if [ ! -z "$REMOTE" ]; then
+                echo "    UnicastOnly on;"                                 >> "$RA"
+                echo "    clients {$REMOTE;};"
+                fi
                 echo "    prefix $addr:/64 {};"                            >> "$RA"
-                echo "    route ::/0 {RemoveRoute on;};"                   >> "$RA"
+                echo "    route 2000::/3 {RemoveRoute on;};"               >> "$RA"
                 echo "    RDNSS $IFADDR {}; "                              >> "$RA"
                 echo "    DNSSL ferrybig.local {};"                        >> "$RA"
+
                 echo " };"                                                 >> "$RA"
 
                 /usr/sbin/radvd -C "$RA" -p "$RAP" 200>/dev/null
