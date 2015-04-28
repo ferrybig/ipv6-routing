@@ -58,7 +58,7 @@ do
         esac
 done
 
-if [ "$INCORRECT" -eq 1 -o -z "$TARGETS"] 
+if [ "$INCORRECT" -eq 1 -o -z "$TARGETS" ] 
 then
         echo "Incorrect usage" &1>2
         exit 1
@@ -87,7 +87,7 @@ fi
         for IFACE in $TARGETS
         do
                 echo "Configuring interface $IFACE"
-                if [ "$LOCAL_DETECT" -eq 1 -o -z "$LOCAL"]; then
+                if [ "$LOCAL_DETECT" -eq 1 -o -z "$LOCAL" ]; then
                         LOCAL="$(ip -6 addr show ppp0 | grep -F link | grep -oEi "fe80\:(\:[a-fA-F0-9]{1,4}){1,7}")"
 
                         if [ -z "$LOCAL" ]; then
@@ -106,11 +106,6 @@ fi
                 if [ "$IPV6_USE_SESSION" -eq "1" -a \( ! -z "$SESSION" \) -a -s "${IPV6_USER_SESSION}$SESSION" ]
                 then
                         IPV6_SESSION="$(cat "${IPV6_USER_SESSION}$SESSION")"
-                        if [ ! -f "$IPV6_SESSION" ]
-                        then
-                                echo "User session not found, did the prefix change?"
-                                IPV6_SESSION=""
-                        fi
                 else
                         IPV6_SESSION=""
                 fi
@@ -121,7 +116,7 @@ fi
                 found=""
                 for range in $IPV6_EXISTING
                 do
-                        if [ -z "$range" ];then
+                        if [ -z "$range" -o ! -f "$range" ];then
                                 continue;
                         fi
                         if [ ! -s "$range" ];then
@@ -135,10 +130,10 @@ fi
                 foundprefix=""
                 if [ "$PREFIX" -eq 1 ]; then
                         for range in $IPV6_EXISTING; do
-                                if [ -z "$range" ]; then
+                                if [ -z "$range" -o ! -f "$range" ] ; then
                                         continue;
                                 fi
-                                if [ ! -s "$range" -a "$range" -eq "$found"]; then
+                                if [ ! -s "$range" -a "$range" != "$found" ] ; then
                                         foundprefix="$range"
                                         break;
                                 else
@@ -152,11 +147,11 @@ fi
                         echo "No free prefix found! Is there a problem with the prefixes"
                         exit 1
                 fi
-                if [ -z "$foundprefix" -a "$PREFIX" -eq 1]; then
+                if [ -z "$foundprefix" -a "$PREFIX" -eq 1 ]; then
                         PREFIX=0
                         echo "No free prefix delegation found!"
                 fi
-                if [ "$IPV6_USE_SESSION" -eq "1" ]; then
+                if [ "$IPV6_USE_SESSION" = "1" ]; then
                         echo "$found" > "${IPV6_USER_SESSION}$SESSION"
                         if [ "$PREFIX" -eq 1 ]; then
                                 echo "$foundprefix" >> "${IPV6_USER_SESSION}$SESSION"
@@ -199,11 +194,11 @@ fi
                 echo "    AdvManagedFlag on;"                              >> "$RA"
                 if [ ! -z "$REMOTE" ]; then
                 echo "    UnicastOnly on;"                                 >> "$RA"
-                echo "    clients {$REMOTE;};"
+                echo "    clients {$REMOTE;};"                             >> "$RA"
                 fi
                 echo "    prefix $addr:/64 {};"                            >> "$RA"
                 echo "    route 2000::/3 {RemoveRoute on;};"               >> "$RA"
-                echo "    RDNSS $IFADDR {}; "                              >> "$RA"
+                echo "    RDNSS $addr:1 {}; "                               >> "$RA"
                 echo "    DNSSL ferrybig.local {};"                        >> "$RA"
 
                 echo " };"                                                 >> "$RA"
@@ -211,15 +206,25 @@ fi
                 /usr/sbin/radvd -C "$RA" -p "$RAP" 200>/dev/null
 
 
-                DHCP="$CONFIG.dhcp6s.conf"
-                DHCP_PID="$CONFIG.dhcp6s.pid"
-                echo "option domain-name-servers $IFADDR;"                > "$DHCP"
-                echo 'option domain-name "ferrybig.local";'               >> "$DHCP"
-                echo "interface $IFACE {"                                 >> "$DHCP"
-                echo "    allow rapid-commit;"                            >> "$DHCP"
-                echo "};"                                                 >> "$DHCP"
+#                DHCP="$CONFIG.dhcp6s.conf"
+#                DHCP_PID="$CONFIG.dhcp6s.pid"
+#                echo "option domain-name-servers $addr:1;"                  > "$DHCP"
+#                echo 'option domain-name "ferrybig.local";'                >> "$DHCP"
+#                echo "interface $IFACE {"                                  >> "$DHCP"
+#                echo "    allow rapid-commit;"                             >> "$DHCP"
+#                echo "};"                                                  >> "$DHCP"
 
-                /usr/sbin/dhcp6s -c "$DHCP" -P "$DHCP_PID" "$IFACE" 200>/dev/null
+#                /usr/sbin/dhcp6s -c "$DHCP" -P "$DHCP_PID" "$IFACE" 200>/dev/null
+
+                if [ "$PREFIX" -eq 1 -a ! -z "$REMOTE" -a ! -z "$foundprefix" ] ; then
+                        echo "$IFACE" > "$foundprefix"
+                        echo "$foundprefix" > "$IPV6_NETWORK_IFACE$IFACE.prefix"
+                        pr="$(basename $foundprefix)"
+                        ip -6 route add "$pr:/64" via "$REMOTE" dev "$IFACE"
+                        /opt/tdhcp/tdhcpd -p "$pr:/64" -d "$addr:1" -D ferrybig.local "$IFACE" 200>/dev/null
+                else
+                        /opt/tdhcp/tdhcpd -d "$addr:1" -D ferrybig.local "$IFACE" 200>/dev/null
+                fi
 
 
 

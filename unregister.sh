@@ -28,27 +28,34 @@ fi
 
 
 
-	if [ -f "$IPV6_NETWORK_IFACE$IFACE.range" ]
-	then
-		echo "Connection for $IFACE was found"
-		addrfile="$(cat "$IPV6_NETWORK_IFACE$IFACE.range")"
-		addr="$(basename $addrfile)"
-		find "$IPV6_NETWORK_IFACE" -type f -name "$IFACE.*" -name "*.pid" -print0 | while IFS= read -r -d $'\0' line; do
-			echo "Found pid file: $line"
-			pid="$(cat $line)"
-			if [ ! -z "$pid" ]; then
-				kill -15 "$pid"
-			else
-				echo "Removing old file: $line"
-				echo rm "$line"
-			fi
-		done
-		/sbin/ip -6 addr del "$addr:1/64" dev "$IFACE"
-		> $addrfile
-		rm $IPV6_NETWORK_IFACE$IFACE.range
-	else
-		echo "Connection $IFACE not found"
-	fi
+        if [ -f "$IPV6_NETWORK_IFACE$IFACE.range" ]
+        then
+                echo "Connection for $IFACE was found"
+                addrfile="$(cat "$IPV6_NETWORK_IFACE$IFACE.range")"
+                addr="$(basename $addrfile)"
+                find "$IPV6_NETWORK_IFACE" -type f -name "$IFACE.*" -name "*.pid" -print0 | while IFS= read -r -d $'\0' line; do
+                        echo "Found pid file: $line"
+                        pid="$(cat $line)"
+                        if [ ! -z "$pid" ]; then
+                                kill -15 "$pid"
+                        else
+                                echo "Removing old file: $line"
+                                echo rm "$line"
+                        fi
+                done
+                if [ -f "$IPV6_NETWORK_IFACE$IFACE.prefix" ]
+                then
+                        prefixfile="$(cat "$IPV6_NETWORK_IFACE$IFACE.prefix")"
+                        > $prefixfile
+                        echo "Removing range $(basename "$prefixfile"):/64 from $IFACE"
+                fi
+                echo "Removing range $addr:/64 from $IFACE"
+                /sbin/ip -6 addr del "$addr:1/64" dev "$IFACE"
+                > $addrfile
+                rm $IPV6_NETWORK_IFACE$IFACE.range
+        else
+                echo "Connection $IFACE not found"
+        fi
 
 
 
