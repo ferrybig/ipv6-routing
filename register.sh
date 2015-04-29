@@ -58,7 +58,7 @@ do
         esac
 done
 
-if [ "$INCORRECT" -eq 1 -o -z "$TARGETS" ] 
+if [ "$INCORRECT" -eq 1 -o -z "$TARGETS" ]
 then
         echo "Incorrect usage" &1>2
         exit 1
@@ -75,7 +75,7 @@ then
         echo "No help for this program"
         exit 0
 fi
-                    
+
 
 
 
@@ -87,20 +87,17 @@ fi
         for IFACE in $TARGETS
         do
                 echo "Configuring interface $IFACE"
-                if [ "$LOCAL_DETECT" -eq 1 -o -z "$LOCAL" ]; then
-                        LOCAL="$(ip -6 addr show ppp0 | grep -F link | grep -oEi "fe80\:(\:[a-fA-F0-9]{1,4}){1,7}")"
-
-                        if [ -z "$LOCAL" ]; then
-                                echo "No link local address found.. Cannot configure $IFACE";
-                                exit 1;
-                        fi
-                fi
-
 
                 if [ -f "$IPV6_NETWORK_IFACE$IFACE.range" ]
                 then
                         echo "Interface $IFACE is already configured! unregister first or clear file $IPV6_NETWORK_IFACE$IFACE.range"
-                        exit 1;
+                        continue;
+                fi
+
+                if [ ! -d "/sys/class/net/$IFACE" ]
+                then
+                        echo "Interface $IFACE not found?"
+                        continue;
                 fi
 
                 if [ "$IPV6_USE_SESSION" -eq "1" -a \( ! -z "$SESSION" \) -a -s "${IPV6_USER_SESSION}$SESSION" ]
@@ -145,7 +142,7 @@ fi
 
                 if [ -z "$found" ]; then
                         echo "No free prefix found! Is there a problem with the prefixes"
-                        exit 1
+                        continue;
                 fi
                 if [ -z "$foundprefix" -a "$PREFIX" -eq 1 ]; then
                         PREFIX=0
@@ -159,7 +156,14 @@ fi
                 fi
 
 
+                if [ "$LOCAL_DETECT" -eq 1 -o -z "$LOCAL" ]; then
+                        LOCAL="$(ip -6 addr show ppp0 | grep -F link | grep -oEi "fe80\:(\:[a-fA-F0-9]{1,4}){1,7}")"
 
+                        if [ -z "$LOCAL" ]; then
+                                echo "No link local address found.. Cannot configure $IFACE";
+                                exit 1;
+                        fi
+                fi
 
 
 
@@ -170,7 +174,7 @@ fi
                         echo "Test mode, found range: $addr in file $range"
                         exit 0;
                 fi
-                
+
                 echo "$IFACE" > "$range"
                 echo "$range" > "$IPV6_NETWORK_IFACE$IFACE.range"
                 #echo "$range" > "$IPV6_NETWORK_IFACE$IFACE.last"
@@ -233,7 +237,7 @@ fi
                 echo "Connection setup, using range: $addr:1/64, session: $SESSION"
         done
 
-        
+
 
 
 
@@ -241,4 +245,3 @@ fi
 
 
 ) 200>$IPV6_NETWORK_DIRECTORY.lockfile
-
