@@ -197,8 +197,9 @@ fi
                 echo "    clients {$REMOTE;};"                             >> "$RA"
                 fi
                 echo "    prefix $addr:/64 {};"                            >> "$RA"
-                echo "    route 2000::/3 {RemoveRoute on;};"               >> "$RA"
-                echo "    RDNSS $addr:1 {}; "                               >> "$RA"
+                echo "    route 2000::/3 {};"                              >> "$RA"
+                echo "    route 2000::/0 {};"                              >> "$RA"
+                echo "    RDNSS $addr:1 {}; "                              >> "$RA"
                 echo "    DNSSL ferrybig.local {};"                        >> "$RA"
 
                 echo " };"                                                 >> "$RA"
