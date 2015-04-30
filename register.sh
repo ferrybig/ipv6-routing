@@ -211,16 +211,6 @@ fi
                 /usr/sbin/radvd -C "$RA" -p "$RAP" 200>/dev/null
 
 
-#                DHCP="$CONFIG.dhcp6s.conf"
-#                DHCP_PID="$CONFIG.dhcp6s.pid"
-#                echo "option domain-name-servers $addr:1;"                  > "$DHCP"
-#                echo 'option domain-name "ferrybig.local";'                >> "$DHCP"
-#                echo "interface $IFACE {"                                  >> "$DHCP"
-#                echo "    allow rapid-commit;"                             >> "$DHCP"
-#                echo "};"                                                  >> "$DHCP"
-
-#                /usr/sbin/dhcp6s -c "$DHCP" -P "$DHCP_PID" "$IFACE" 200>/dev/null
-
                 if [ "$PREFIX" -eq 1 -a ! -z "$REMOTE" -a ! -z "$foundprefix" ] ; then
                         echo "$IFACE" > "$foundprefix"
                         echo "$foundprefix" > "$IPV6_NETWORK_IFACE$IFACE.prefix"
